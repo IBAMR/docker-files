@@ -1,7 +1,16 @@
 # Docker images for IBAMR
 
-These images contain all of IBAMR's dependencies. Presently, we just have a
-single dockerfile corresponding to Fedora 33.
+Dockerfiles for working with IBAMR and its dependencies. Compiled docker images
+are available here:
+
+https://hub.docker.com/r/wellsd2/ibamr/tags
+
+# Repository Layout
+
+- `dependencies/` contains Dockerfiles for building all of IBAMR's dependencies in
+  several different configurations. These are used in IBAMR's CI scripts.
+- `ibamr/` contains Dockerfiles for building both IBAMR and its dependencies, as
+  well as some downstream projects (fiddle).
 
 ## Submitting your own images to docker hub
 

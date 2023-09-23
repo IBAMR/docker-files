@@ -1,4 +1,4 @@
-FROM fedora:33
+FROM fedora:36
 MAINTAINER David Wells <drwells@email.unc.edu>
 
 ##
@@ -7,37 +7,24 @@ MAINTAINER David Wells <drwells@email.unc.edu>
 RUN dnf update -y && \
   dnf install -y gcc g++ gfortran && \
   dnf install -y diffutils m4 gawk sed grep python3 patch which && \
-  dnf install -y sudo cmake wget && \
+  dnf install -y sudo cmake wget ccache && \
   dnf install -y zlib-devel mpich-devel blas-devel && \
   dnf install -y lapack-devel hdf5-mpich-devel libtirpc-devel && \
   dnf clean all
 
-##   B. Some non-RPM binaries from elsewhere:
-
-##     i. sccache binaries for use when building IBAMR:
-
-RUN \
-  cd /tmp && \
-  echo "e735afaac1ac3655a77104296535476a9485f571c67d22a1381a3f1b32c73172 sccache" > sccache.sum && \
-  wget -q -O sccache "https://gitlab.kitware.com/api/v4/projects/6955/packages/generic/sccache/v0.2.15-background-init-20210523.0/sccache-v0.2.15-background-init-x86_64-unknown-linux-musl" && \
-  sha256sum -c sccache.sum && \
-  chmod +x sccache && \
-  mv sccache /usr/bin
-
-##   C. Specific versions of things from source:
+##   B. Specific versions of things from source:
 ##
 ##      i. petsc
 ##         + Note that we monkey-patch the configure script to work with
 ##           Python >= 3.9 as threading.Thread.isAlive has been renamed.
-##         + We also manually download silo; the original download was removed
-##           due to a bug, causing the petsc build to fail.
+##         + Manually download Silo (IBAMR requires 4.11 or newer)
 
 RUN \
   unset PETSC_DIR && \
   export PETSC_ARCH=x86_64 && \
   mkdir -p /build/petsc && \
   cd /build/petsc && \
-  wget -q https://wci.llnl.gov/sites/wci/files/2021-01/silo-4.10.2-bsd-smalltest.tgz && \
+  wget -q https://github.com/LLNL/Silo/releases/download/v4.11/silo-4.11-bsd.tar.gz && \
   wget -q http://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-3.13.4.tar.gz && \
   tar xzf petsc-3.13.4.tar.gz && \
   cd petsc-3.13.4 && \
@@ -60,7 +47,7 @@ RUN \
     --download-metis=1 \
     --download-parmetis=1 \
     --with-fortran-bindings=0 \
-    --download-silo=/build/petsc/silo-4.10.2-bsd-smalltest.tgz \
+    --download-silo=/build/petsc/silo-4.11-bsd.tar.gz \
     --with-x=0 && \
   make PETSC_DIR=$(pwd) PETSC_ARCH=${PETSC_ARCH} all && \
   make install && \
@@ -154,11 +141,11 @@ RUN \
   mkdir -p /build/samrai/bld && \
   cd /build/samrai && \
   wget -q https://github.com/LLNL/SAMRAI/archive/refs/tags/2.4.4.tar.gz && \
-  wget -q https://github.com/IBAMR/IBAMR/releases/download/v0.10.1/samrai-2.4.4-patch-ibamr-0.10.patch && \
+  wget -q https://github.com/IBAMR/IBAMR/releases/download/v0.12.0/samrai-2.4.4-patch-ibamr-0.12.patch && \
   tar xzf 2.4.4.tar.gz && \
   mv SAMRAI-2.4.4 2.4.4 && \
   cd 2.4.4 && \
-  patch -p1 < ../samrai-2.4.4-patch-ibamr-0.10.patch && \
+  patch -p1 < ../samrai-2.4.4-patch-ibamr-0.12.patch && \
   cd ../bld && \
   ../2.4.4/configure \
     CFLAGS="-fPIC -O3" \
@@ -171,7 +158,7 @@ RUN \
     --with-F77=/usr/lib64/mpich/bin/mpifort \
     --with-hdf5=/build/hdf5-shim \
     --without-hypre \
-    --with-silo=/petsc/ \
+    --without-silo \
     --without-blaslapack \
     --without-cubes \
     --without-eleven \
