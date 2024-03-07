@@ -1,4 +1,4 @@
-FROM archlinux:base-20230723.0.166908
+FROM archlinux:base-20240101.0.204074
 MAINTAINER David Wells <drwells@email.unc.edu>
 
 ##
@@ -56,15 +56,31 @@ RUN                                                                         \
       pushd $PKG                                                         && \
       if [ "$PKG" = "hypre" ] ; then                                        \
         sed -i 's/-fopenmp//g' PKGBUILD                                  && \
-        sed -i '/--with-openmp/d' PKGBUILD                               && \
-        sed -i 's/pkgver=2....0/pkgver=2.27.0/' PKGBUILD                 && \
-        sed -i "s/sha512sums=('.*')/sha512sums=('44a15c4fab2b779bdd22cbab32176dd9563551f538405dc8f48e5c8fee2af21c39b7c4ebc08c663a2e005d09df949a17b529eed74a2a8a6cb398d1eaafab8af8')/" PKGBUILD ; \
+        sed -i '/--with-openmp/d' PKGBUILD                               ;  \
       fi                                                                 && \
       if [ "$PKG" = "petsc" ] ; then                                        \
+        sed -i 's/LDFLAGS=$LDFLAGS/LDFLAGS=-lstdc++/' PKGBUILD           && \
         sed -i "s/'python-numpy'//" PKGBUILD                             && \
+        sed -i "s/'python-mpi4py'//" PKGBUILD                            && \
+        sed -i "s/with-mpi-f90module-visibility=0/with-fortran-bindings=0/" PKGBUILD && \
         sed -i "s/'cython'//" PKGBUILD                                   && \
+        sed -i "s/'fftw'//" PKGBUILD                                     && \
+        sed -i '/--with-fftw/d' PKGBUILD                                 && \
+        sed -i "s/'gsl'//" PKGBUILD                                      && \
+        sed -i '/--with-gsl/d' PKGBUILD                                  && \
+        sed -i "s/'suitesparse'//" PKGBUILD                              && \
+        sed -i '/--with-suitesparse/d' PKGBUILD                          && \
+        sed -i "s/'libyaml'//" PKGBUILD                                  && \
+        sed -i '/--with-yaml/d' PKGBUILD                                 && \
+        sed -i "s/'libjpeg-turbo'//" PKGBUILD                            && \
+        sed -i '/--with-libjpeg/d' PKGBUILD                              && \
+        sed -i "s/'netcdf-openmpi'//" PKGBUILD                           && \
+        sed -i '/--with-netcdf/d' PKGBUILD                               && \
+        sed -i "s/'zfp'//" PKGBUILD                                      && \
+        sed -i '/--with-zfp/d' PKGBUILD                                  && \
         sed -i '/provides.*petsc4py/d' PKGBUILD                          && \
-        sed -i 's/petsc4py=1/petsc4py=0/' PKGBUILD                       ;  \
+        sed -i 's/petsc4py=1/petsc4py=0/' PKGBUILD                       && \
+        sed -i 's/make check//' PKGBUILD                                 ;  \
       fi                                                                 && \
       makepkg                                                            && \
       echo "pw" | sudo -S pacman --noconfirm -U $PKG*zst                 && \
@@ -83,11 +99,9 @@ RUN                                                                     \
   mkdir /samrai                                                      && \
   mkdir -p /build/                                                   && \
   cd /build/                                                         && \
-  wget https://github.com/LLNL/SAMRAI/archive/refs/tags/2.4.4.tar.gz && \
-  tar xf 2.4.4.tar.gz                                                && \
-  cd SAMRAI-2.4.4                                                    && \
-  wget https://github.com/IBAMR/IBAMR/releases/download/v0.13.0/samrai-2.4.4-patch-ibamr-0.13.0.patch && \
-  patch -p1 < samrai-2.4.4-patch-ibamr-0.13.0.patch                  && \
+  wget https://github.com/IBAMR/IBSAMRAI2/archive/refs/tags/2024.02.22.tar.gz && \
+  tar xf 2024.02.22.tar.gz                                           && \
+  cd IBSAMRAI2-2024.02.22                                            && \
   mkdir build                                                        && \
   cd build                                                           && \
   ../configure                                                          \
@@ -106,6 +120,7 @@ RUN                                                                     \
       --without-x                                                       \
       --without-doxygen                                                 \
       --enable-debug                                                    \
+      --enable-dcomplex                                                 \
       --with-hdf5=/usr/                                                 \
       --enable-implicit-template-instantiation                          \
       --disable-deprecated                                           && \
@@ -121,9 +136,9 @@ RUN                                                                       \
   mkdir /ibamr                                                         && \
   mkdir -p /build/                                                     && \
   cd /build/                                                           && \
-  wget https://github.com/IBAMR/IBAMR/archive/refs/tags/v0.13.0.tar.gz && \
-  tar xf v0.13.0.tar.gz                                                && \
-  cd IBAMR-0.13.0                                                      && \
+  wget https://github.com/IBAMR/IBAMR/archive/refs/tags/v0.14.0.tar.gz && \
+  tar xf v0.14.0.tar.gz                                                && \
+  cd IBAMR-0.14.0                                                      && \
   mkdir build                                                          && \
   cd build                                                             && \
   cmake -DCMAKE_CXX_FLAGS="-O2"                                           \

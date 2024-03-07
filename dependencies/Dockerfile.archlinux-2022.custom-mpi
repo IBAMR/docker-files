@@ -1,4 +1,4 @@
-FROM archlinux:base-20220529.0.58327
+FROM archlinux:base-20240101.0.204074
 MAINTAINER David Wells <drwells@email.unc.edu>
 
 # Dockerfile which sets up a custom MPI installation to make sure we detect it
@@ -12,7 +12,7 @@ MAINTAINER David Wells <drwells@email.unc.edu>
 ##   We will *not* use these muparser, hdf5, eigen, or metis installations, but
 ##   we install them here anyway to verify that we can correctly set up IBAMR
 ##   with custom non-system dependencies.
-RUN pacman --noconfirm -Syu awk ccache cmake diffutils eigen gcc gcc-fortran grep hdf5-openmpi lapack libtirpc m4 make metis muparser openmpi patch python sed wget && pacman --noconfirm -Scc && find /var/cache/pacman -delete
+RUN pacman --noconfirm -Syu awk ccache cmake diffutils eigen gcc gcc-fortran git grep hdf5-openmpi lapack libtirpc m4 make muparser openmpi patch perl python sed wget && pacman --noconfirm -Scc && find /var/cache/pacman -delete
 
 ##   B. Specific versions of things from source:
 ##
@@ -25,10 +25,10 @@ RUN \
   export PETSC_ARCH=x86_64 && \
   mkdir -p /build/petsc && \
   cd /build/petsc && \
-  wget -q https://wci.llnl.gov/sites/wci/files/2021-01/silo-4.10.2-bsd-smalltest.tgz && \
-  wget -q http://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-3.17.2.tar.gz && \
-  tar xzf petsc-3.17.2.tar.gz && \
-  cd petsc-3.17.2 && \
+  wget -q https://github.com/LLNL/Silo/releases/download/v4.11/silo-4.11-bsd.tar.gz && \
+  wget -q https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-3.18.6.tar.gz && \
+  tar xf petsc-3.18.6.tar.gz && \
+  cd petsc-3.18.6 && \
   /usr/bin/python configure \
     --prefix=/petsc/ \
     --COPTFLAGS="-O3" \
@@ -48,22 +48,24 @@ RUN \
     --with-x=0 && \
   make PETSC_DIR=$(pwd) PETSC_ARCH=${PETSC_ARCH} all && \
   make install && \
-  cd ~/ && \
-  rm -rf /build
+  cd / && \
+  rm -rf /build/
 
 ##      ii. libmesh
 
+# Try to fix their broken usage of PETSc DMs by just deleting all the error checks
 RUN \
   mkdir -p /build/libmesh/build && \
   mkdir -p /libmesh && \
   cd /build/libmesh && \
-  wget -q https://github.com/libMesh/libmesh/releases/download/v1.6.2/libmesh-1.6.2.tar.gz && \
-  tar xzf libmesh-1.6.2.tar.gz && \
-  mv libmesh-1.6.2 1.6.2 && \
+  wget -q https://github.com/libMesh/libmesh/releases/download/v1.7.1/libmesh-1.7.1.tar.gz && \
+  tar xzf libmesh-1.7.1.tar.gz && \
+  mv libmesh-1.7.1 1.7.1 && \
+  sed -i '/SETERRQ2/d' ./1.7.1/src/solvers/petscdmlibmeshimpl.C && \
   cd build && \
   export PETSC_DIR=/petsc/ && \
   export PETSC_ARCH= && \
-    ../1.6.2/configure \
+    ../1.7.1/configure \
     CC=/petsc/bin/mpicc \
     CXX=/petsc/bin/mpic++ \
     FC=/petsc/bin/mpifort \
@@ -105,7 +107,7 @@ RUN \
     PETSC_ARCH=${PETSC_ARCH} \
     && \
   make -j6 install && \
-  cd ~/ && \
+  cd / && \
   rm -rf /build
 
 ##      iii. numdiff
@@ -121,7 +123,7 @@ RUN \
   cd 5.9.0 && \
   ./configure --prefix=/numdiff && \
   make -j6 install && \
-  cd ~/ && \
+  cd / && \
   rm -rf /build
 
 ##      iv. SAMRAI
@@ -131,14 +133,10 @@ RUN \
   mkdir -p /build/samrai && \
   mkdir -p /build/samrai/build && \
   cd /build/samrai && \
-  wget -q https://github.com/LLNL/SAMRAI/archive/refs/tags/2.4.4.tar.gz && \
-  wget -q https://github.com/IBAMR/IBAMR/releases/download/v0.10.1/samrai-2.4.4-patch-ibamr-0.10.patch && \
-  tar xzf 2.4.4.tar.gz && \
-  mv SAMRAI-2.4.4 2.4.4 && \
-  cd 2.4.4 && \
-  patch -p1 < ../samrai-2.4.4-patch-ibamr-0.10.patch && \
-  cd ../build && \
-  ../2.4.4/configure \
+  wget -q https://github.com/IBAMR/IBSAMRAI2/archive/refs/tags/2024.02.22.tar.gz && \
+  tar xf 2024.02.22.tar.gz && \
+  cd build && \
+  ../IBSAMRAI2-2024.02.22/configure \
     CFLAGS="-fPIC -O3" \
     CXXFLAGS="-fPIC -O3" \
     FFLAGS="-fPIC -O3" \
@@ -162,5 +160,5 @@ RUN \
     && \
   make -j6 && \
   make -j6 install && \
-  cd ~/ && \
+  cd / && \
   rm -rf /build/
