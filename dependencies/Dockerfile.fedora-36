@@ -7,7 +7,7 @@ MAINTAINER David Wells <drwells@email.unc.edu>
 RUN dnf update -y && \
   dnf install -y gcc g++ gfortran && \
   dnf install -y diffutils m4 gawk sed grep python3 patch which && \
-  dnf install -y sudo cmake wget ccache && \
+  dnf install -y sudo cmake wget git ccache && \
   dnf install -y zlib-devel mpich-devel blas-devel && \
   dnf install -y lapack-devel hdf5-mpich-devel libtirpc-devel && \
   dnf clean all
@@ -31,7 +31,7 @@ RUN \
   mv config/BuildSystem/script.py /tmp/script.py && \
   sed -e 's/isAlive/is_alive/g' /tmp/script.py > config/BuildSystem/script.py && \
   rm -f /tmp/script.py && \
-  /usr/bin/python3.9 configure \
+  /usr/bin/python3 configure \
     --prefix=/petsc/ \
     --CC=/usr/lib64/mpich/bin/mpicc \
     --CXX=/usr/lib64/mpich/bin/mpic++ \
@@ -138,16 +138,12 @@ RUN \
   ln -s /usr/include/mpich-x86_64 /build/hdf5-shim/include && \
   ln -s /usr/lib64/mpich/lib /build/hdf5-shim/lib && \
   mkdir -p /samrai && \
-  mkdir -p /build/samrai/bld && \
+  mkdir -p /build/samrai/build && \
   cd /build/samrai && \
-  wget -q https://github.com/LLNL/SAMRAI/archive/refs/tags/2.4.4.tar.gz && \
-  wget -q https://github.com/IBAMR/IBAMR/releases/download/v0.12.0/samrai-2.4.4-patch-ibamr-0.12.patch && \
-  tar xzf 2.4.4.tar.gz && \
-  mv SAMRAI-2.4.4 2.4.4 && \
-  cd 2.4.4 && \
-  patch -p1 < ../samrai-2.4.4-patch-ibamr-0.12.patch && \
-  cd ../bld && \
-  ../2.4.4/configure \
+  wget -q https://github.com/IBAMR/IBSAMRAI2/archive/refs/tags/2024.02.22.tar.gz && \
+  tar xf 2024.02.22.tar.gz && \
+  cd build && \
+  ../IBSAMRAI2-2024.02.22/configure \
     CFLAGS="-fPIC -O3" \
     CXXFLAGS="-fPIC -O3" \
     FFLAGS="-fPIC -O3" \

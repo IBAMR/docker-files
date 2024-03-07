@@ -10,7 +10,7 @@ RUN yum install -y dnf && dnf update -y && \
      dnf install -y epel-release && \
      dnf install -y gcc gcc-c++ gcc-gfortran && \
      dnf install -y diffutils m4 make gawk sed grep patch which && \
-     dnf install -y cmake3 wget ccache && \
+     dnf install -y cmake3 git wget ccache && \
      dnf install -y zlib-devel mpich-devel blas-devel && \
      dnf install -y lapack-devel hdf5-mpich-devel libtirpc-devel && \
      dnf clean all && yum clean all
