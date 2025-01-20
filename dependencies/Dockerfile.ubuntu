@@ -1,0 +1,170 @@
+FROM ubuntu:focal-20241011
+MAINTAINER David Wells <drwells@email.unc.edu>
+
+ENV FFLAGS="-O3"
+ENV CFLAGS="-O2"
+ENV CXXFLAGS="${CFLAGS} -D_GLIBCXX_ASSERTIONS"
+
+ENV PETSC_VERSION=3.13.6
+ENV PETSC_SOURCE="https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-${PETSC_VERSION}.tar.gz"
+
+ENV SAMRAI_VERSION=2025.01.09
+ENV SAMRAI_SOURCE="https://github.com/IBAMR/IBSAMRAI2/archive/refs/tags/${SAMRAI_VERSION}.tar.gz"
+
+ENV NUMDIFF_VERSION=5.9.0
+ENV NUMDIFF_SOURCE="https://download-mirror.savannah.gnu.org/releases/numdiff/numdiff-${NUMDIFF_VERSION}.tar.gz"
+
+ENV LIBMESH_VERSION=1.7.3
+ENV LIBMESH_SOURCE="https://github.com/libMesh/libmesh/releases/download/v${LIBMESH_VERSION}/libmesh-${LIBMESH_VERSION}.tar.gz"
+
+RUN echo "America/New_York" >/etc/timezone
+
+RUN ln -fs /usr/share/zoneinfo/$(cat /etc/timezone) /etc/localtime
+
+RUN apt update &&                                                              \
+    apt install -y                                                             \
+        ccache cmake g++ gcc gfortran git libhdf5-openmpi-dev libopenmpi-dev   \
+        liblapack-dev ninja-build python3 python3-distutils wget            && \
+    apt-get clean
+
+# PETSc (with hypre and metis)
+RUN mkdir /build/                                                           && \
+    cd /build/                                                              && \
+    wget -q "${PETSC_SOURCE}"                                               && \
+    tar xf "petsc-${PETSC_VERSION}.tar.gz"                                  && \
+    cd "petsc-${PETSC_VERSION}"                                             && \
+    export PETSC_ARCH="x86_O2"                                              && \
+    python3 ./configure                                                        \
+    --prefix=/petsc/                                                           \
+    --FFLAGS="${FFLAGS}"                                                       \
+    --CFLAGS="${CFLAGS}"                                                       \
+    --CXXFLAGS="${CXXFLAGS}"                                                   \
+    --download-hypre=1                                                         \
+    --download-metis=1                                                         \
+    --download-parmetis=1                                                      \
+    --with-debugging=1                                                         \
+    --with-fortran-bindings=0                                                  \
+    --with-hdf5=0                                                              \
+    --with-shared-libraries=1                                                  \
+    --with-mpi-dir=/usr/                                                    && \
+    make -j4 PETSC_DIR="$(pwd)" PETSC_ARCH="$PETSC_ARCH" all                && \
+    make -j4 install                                                        && \
+    rm -rf /petsc/share/                                                    && \
+    rm -rf /petsc/bin/                                                      && \
+    rm -rf /petsc/lib/*.a                                                   && \
+    rm -rf /petsc/lib/*.la                                                  && \
+    rm -rf /petsc/lib/petsc/bin/                                            && \
+    cd /                                                                    && \
+    rm -rf /build/
+
+# SAMRAI
+RUN mkdir /samrai                                                           && \
+  mkdir -p /build                                                           && \
+  mkdir -p /build/hdf5-shim                                                 && \
+  cd /build/hdf5-shim                                                       && \
+  ln -s /usr/include/hdf5/openmpi /build/hdf5-shim/include                  && \
+  ln -s /usr/lib/x86_64-linux-gnu/hdf5/openmpi /build/hdf5-shim/lib         && \
+  ls /build/hdf5-shim/                                                      && \
+  cd /build/                                                                && \
+  wget -q "${SAMRAI_SOURCE}"                                                && \
+  tar xf "${SAMRAI_VERSION}.tar.gz"                                         && \
+  cd "IBSAMRAI2-${SAMRAI_VERSION}"                                          && \
+  mkdir build                                                               && \
+  cd build                                                                  && \
+  ../configure                                                                 \
+      CC="$(which mpicc)"                                                      \
+      CXX="$(which mpicxx)"                                                    \
+      FC="$(which mpicxx)"                                                     \
+      FFLAGS="${FFLAGS} -fPIC"                                                 \
+      CFLAGS="${CFLAGS} -fPIC"                                                 \
+      CXXFLAGS="${CXXFLAGS} -fPIC"                                             \
+      --prefix=/samrai                                                         \
+      --with-F77="$(which gfortran)"                                           \
+      --without-hypre                                                          \
+      --without-silo                                                           \
+      --without-blaslapack                                                     \
+      --without-cubes                                                          \
+      --without-eleven                                                         \
+      --without-petsc                                                          \
+      --without-sundials                                                       \
+      --without-x                                                              \
+      --without-doxygen                                                        \
+      --enable-debug                                                           \
+      --enable-dcomplex                                                        \
+      --with-hdf5=/build/hdf5-shim/                                            \
+      --enable-implicit-template-instantiation                                 \
+      --disable-deprecated                                                  && \
+  make -j4                                                                  && \
+  make -j4 install                                                          && \
+  cd /                                                                      && \
+  rm -rf /build/
+
+# numdiff
+RUN mkdir /numdiff/                                                         && \
+  mkdir -p /build/                                                          && \
+  cd /build/                                                                && \
+  wget -q "${NUMDIFF_SOURCE}"                                               && \
+  tar xf "numdiff-${NUMDIFF_VERSION}.tar.gz"                                && \
+  cd "numdiff-${NUMDIFF_VERSION}"                                           && \
+  mkdir build                                                               && \
+  cd build                                                                  && \
+  ../configure --disable-nls --prefix=/numdiff                              && \
+  make -j4 install                                                          && \
+  cd /                                                                      && \
+  rm -rf /build/
+
+# libMesh
+RUN mkdir /build/                                                           && \
+  cd /build/                                                                && \
+  wget -q "${LIBMESH_SOURCE}"                                               && \
+  tar xf "libmesh-${LIBMESH_VERSION}.tar.gz"                                && \
+  cd "libmesh-${LIBMESH_VERSION}"                                           && \
+  mkdir build                                                               && \
+  cd build                                                                  && \
+    ../configure                                                               \
+      MPI_HOME=/usr/                                                           \
+      PETSC_DIR=/petsc/                                                        \
+      CC="$(which mpicc)"                                                      \
+      CXX="$(which mpic++)"                                                    \
+      FC="$(which mpifort)"                                                    \
+      --prefix=/libmesh                                                        \
+      --with-methods=opt                                                       \
+      --with-mpi                                                               \
+      --disable-boost                                                          \
+      --disable-capnproto                                                      \
+      --disable-cppunit                                                        \
+      --disable-eigen                                                          \
+      --disable-examples                                                       \
+      --disable-fparser                                                        \
+      --disable-hdf5                                                           \
+      --disable-laspack                                                        \
+      --disable-metaphysicl                                                    \
+      --disable-nlopt                                                          \
+      --disable-openmp                                                         \
+      --disable-perflog                                                        \
+      --disable-pthreads                                                       \
+      --disable-reference-counting                                             \
+      --disable-vtk                                                            \
+      --enable-curl=no                                                         \
+      --enable-exodus=yes                                                      \
+      --enable-glpk=no                                                         \
+      --enable-nanoflann=no                                                    \
+      --enable-qhull=no                                                        \
+      --enable-tecplot=no                                                      \
+      --enable-timestamps=no                                                   \
+      --enable-triangle                                                        \
+      --enable-unique-id                                                       \
+      --enable-mpi                                                             \
+      --enable-petsc                                                           \
+      --enable-petsc-required                                                  \
+      --with-thread-model=none                                                 \
+      --with-metis=PETSc                                                       \
+      --disable-strict-lgpl                                                    \
+      --disable-glibcxx-debugging                                           && \
+      make -j4 install                                                      && \
+      cd /                                                                  && \
+      rm -rf /build
+
+RUN                                                               \
+  useradd --password "$(perl -e 'print crypt('pw', "password")')" \
+          --groups users,sudo build
