@@ -1,29 +1,30 @@
-FROM archlinux:base-20250105.0.295102
+FROM archlinux:base-20250921.0.423275
 MAINTAINER David Wells <drwells@email.unc.edu>
 
 ENV FFLAGS="-O3 -ftrivial-auto-var-init=pattern"
 ENV CFLAGS="-O2 -ftrivial-auto-var-init=pattern -D_FORTIFY_SOURCE=3 -fuse-ld=mold"
 ENV CXXFLAGS="${CFLAGS} -D_GLIBCXX_ASSERTIONS"
 
-ENV PETSC_VERSION=3.22.2
+ENV PETSC_VERSION=3.23.6
 ENV PETSC_SOURCE="https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-${PETSC_VERSION}.tar.gz"
 
-ENV SAMRAI_VERSION=2025.01.09
+ENV SAMRAI_VERSION=2025.09.12
 ENV SAMRAI_SOURCE="https://github.com/IBAMR/IBSAMRAI2/archive/refs/tags/${SAMRAI_VERSION}.tar.gz"
 
 ENV NUMDIFF_VERSION=5.9.0
 ENV NUMDIFF_SOURCE="https://download-mirror.savannah.gnu.org/releases/numdiff/numdiff-${NUMDIFF_VERSION}.tar.gz"
 
-ENV LIBMESH_VERSION=1.7.3
+ENV LIBMESH_VERSION=1.7.8
 ENV LIBMESH_SOURCE="https://github.com/libMesh/libmesh/releases/download/v${LIBMESH_VERSION}/libmesh-${LIBMESH_VERSION}.tar.gz"
 
-RUN                                                                    \
-  echo 'Server = http://mirror.cs.vt.edu/pub/ArchLinux/$repo/os/$arch' \
-      >/etc/pacman.d/mirrorlist                               &&       \
-  echo 'Server = http://mirror.cs.pitt.edu/ArchLinux/$repo/os/$arch'   \
+RUN                                                                            \
+  echo 'Server = http://mirror.cs.vt.edu/pub/ArchLinux/$repo/os/$arch'         \
+      >/etc/pacman.d/mirrorlist                                             && \
+  echo 'Server = http://mirror.cs.pitt.edu/ArchLinux/$repo/os/$arch'           \
       >>/etc/pacman.d/mirrorlist
 
 RUN                                                                            \
+  pacman-key --init                                                         && \
   pacman --noconfirm -Syu awk bc boost ccache cmake diffutils eigen gcc        \
       fakeroot gcc-fortran grep git hdf5-openmpi lapack lua m4 make mold       \
       muparser netcdf ninja openmpi patch pcre python sed sudo superlu         \
@@ -98,7 +99,7 @@ RUN mkdir /samrai                                                           && \
   find /samrai -type f -name '*.a' | xargs strip -g                         && \
   rm -rf /build/
 
-# numdiff
+# numdiff. Requires -std=gnu99.
 RUN mkdir /numdiff/                                                         && \
   mkdir -p /build/                                                          && \
   cd /build/                                                                && \
@@ -107,22 +108,26 @@ RUN mkdir /numdiff/                                                         && \
   cd "numdiff-${NUMDIFF_VERSION}"                                           && \
   mkdir build                                                               && \
   cd build                                                                  && \
-  ../configure --disable-nls --prefix=/numdiff                              && \
+  ../configure --disable-nls CFLAGS="-std=gnu99 -O2" --prefix=/numdiff      && \
   make -j4 install                                                          && \
   cd /                                                                      && \
   rm -rf /build/
 
-# libMesh. Also strip debug symbols.
+# libMesh. Add a missing header to communicator.h via sed.
+# Also strip debug symbols.
 RUN mkdir /build/                                                           && \
   cd /build/                                                                && \
   wget -q "${LIBMESH_SOURCE}"                                               && \
   tar xf "libmesh-${LIBMESH_VERSION}.tar.gz"                                && \
   cd "libmesh-${LIBMESH_VERSION}"                                           && \
+  sed -i '41i#include <cstdint>'                                               \
+    ./contrib/timpi/src/parallel/include/timpi/communicator.h               && \
   mkdir build                                                               && \
   cd build                                                                  && \
     ../configure                                                               \
       MPI_HOME=/usr/                                                           \
       PETSC_DIR=/petsc/                                                        \
+      CFLAGS="${CFLAGS} -std=gnu99"                                            \
       CC="$(which mpicc)"                                                      \
       CXX="$(which mpic++)"                                                    \
       FC="$(which mpifort)"                                                    \
