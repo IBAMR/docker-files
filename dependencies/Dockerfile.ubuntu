@@ -8,13 +8,13 @@ ENV CXXFLAGS="${CFLAGS} -D_GLIBCXX_ASSERTIONS"
 ENV PETSC_VERSION=3.13.6
 ENV PETSC_SOURCE="https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-${PETSC_VERSION}.tar.gz"
 
-ENV SAMRAI_VERSION=2025.01.09
+ENV SAMRAI_VERSION=2025.09.12
 ENV SAMRAI_SOURCE="https://github.com/IBAMR/IBSAMRAI2/archive/refs/tags/${SAMRAI_VERSION}.tar.gz"
 
 ENV NUMDIFF_VERSION=5.9.0
 ENV NUMDIFF_SOURCE="https://download-mirror.savannah.gnu.org/releases/numdiff/numdiff-${NUMDIFF_VERSION}.tar.gz"
 
-ENV LIBMESH_VERSION=1.7.3
+ENV LIBMESH_VERSION=1.7.8
 ENV LIBMESH_SOURCE="https://github.com/libMesh/libmesh/releases/download/v${LIBMESH_VERSION}/libmesh-${LIBMESH_VERSION}.tar.gz"
 
 RUN echo "America/New_York" >/etc/timezone
