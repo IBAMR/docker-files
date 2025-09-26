@@ -27,9 +27,10 @@ RUN                                                                            \
   pacman --noconfirm -Syu awk bc boost ccache cmake diffutils eigen gcc        \
       fakeroot gcc-fortran grep git hdf5-openmpi lapack lua m4 make mold       \
       muparser netcdf ninja openmpi patch pcre python sed sudo superlu         \
-      which wget zlib     &&                                                   \
-  pacman --noconfirm -Scc &&                                                   \
-  find /var/cache/pacman  -delete
+      which wget zlib                                                       && \
+  pacman --noconfirm -Scc                                                   && \
+  find /usr/lib/ -type f -name 'libboost*.a' -delete                        && \
+  find /var/cache/pacman -delete
 
 # PETSc (with hypre and metis)
 RUN mkdir /build/                                                           && \
@@ -62,7 +63,7 @@ RUN mkdir /build/                                                           && \
     cd /                                                                    && \
     rm -rf /build/
 
-# SAMRAI
+# SAMRAI. Do an additional postprocessing step of stripping debug symbols.
 RUN mkdir /samrai                                                           && \
   mkdir -p /build/                                                          && \
   cd /build/                                                                && \
@@ -94,6 +95,7 @@ RUN mkdir /samrai                                                           && \
   make -j4                                                                  && \
   make -j4 install                                                          && \
   cd /                                                                      && \
+  find /samrai -type f -name '*.a' | xargs strip -g                         && \
   rm -rf /build/
 
 # numdiff
@@ -110,7 +112,7 @@ RUN mkdir /numdiff/                                                         && \
   cd /                                                                      && \
   rm -rf /build/
 
-# libMesh
+# libMesh. Also strip debug symbols.
 RUN mkdir /build/                                                           && \
   cd /build/                                                                && \
   wget -q "${LIBMESH_SOURCE}"                                               && \
@@ -125,7 +127,7 @@ RUN mkdir /build/                                                           && \
       CXX="$(which mpic++)"                                                    \
       FC="$(which mpifort)"                                                    \
       --prefix=/libmesh                                                        \
-      --with-methods=opt                                                       \
+      --with-methods=devel                                                     \
       --with-mpi                                                               \
       --disable-boost                                                          \
       --disable-capnproto                                                      \
@@ -160,6 +162,8 @@ RUN mkdir /build/                                                           && \
       --disable-glibcxx-debugging                                           && \
       make -j4 install                                                      && \
       cd /                                                                  && \
+      find /libmesh -type f -name '*.a' -delete                             && \
+      find /libmesh -type f -name '*.so.*' | xargs strip -g                 && \
       rm -rf /build
 
 RUN                                                               \
