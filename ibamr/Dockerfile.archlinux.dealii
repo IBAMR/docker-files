@@ -1,0 +1,206 @@
+FROM archlinux:base-20250921.0.423275
+MAINTAINER David Wells <drwells@email.unc.edu>
+
+ENV FFLAGS="-O3 -ftrivial-auto-var-init=pattern"
+ENV CFLAGS="-O2 -ftrivial-auto-var-init=pattern -D_FORTIFY_SOURCE=3 -fuse-ld=mold"
+ENV CXXFLAGS="${CFLAGS} -D_GLIBCXX_ASSERTIONS"
+
+ENV PETSC_VERSION="3.23.6"
+ENV PETSC_SOURCE="https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-${PETSC_VERSION}.tar.gz"
+
+ENV SAMRAI_VERSION="2025.09.12"
+ENV SAMRAI_SOURCE="https://github.com/IBAMR/IBSAMRAI2/archive/refs/tags/${SAMRAI_VERSION}.tar.gz"
+
+ENV NUMDIFF_VERSION="5.9.0"
+ENV NUMDIFF_SOURCE="https://download-mirror.savannah.gnu.org/releases/numdiff/numdiff-${NUMDIFF_VERSION}.tar.gz"
+
+ENV EXODUS_II_VERSION="2025-08-28"
+ENV EXODUS_II_SOURCE="https://github.com/sandialabs/seacas/archive/refs/tags/v${EXODUS_II_VERSION}.tar.gz"
+
+ENV DEAL_II_VERSION="9.7.1"
+ENV DEAL_II_SOURCE="https://github.com/dealii/dealii/releases/download/v${DEAL_II_VERSION}/dealii-${DEAL_II_VERSION}.tar.gz"
+
+ENV IBAMR_VERSION="0.17.0"
+ENV IBAMR_SOURCE="https://github.com/IBAMR/IBAMR/archive/refs/tags/v${IBAMR_VERSION}.tar.gz"
+
+RUN                                                                            \
+  echo 'Server = http://mirror.cs.vt.edu/pub/ArchLinux/$repo/os/$arch'         \
+      >/etc/pacman.d/mirrorlist                                             && \
+  echo 'Server = http://mirror.cs.pitt.edu/ArchLinux/$repo/os/$arch'           \
+      >>/etc/pacman.d/mirrorlist
+
+RUN                                                                            \
+  pacman-key --init                                                         && \
+  pacman --noconfirm -Syu awk bc boost ccache cmake diffutils eigen gcc        \
+      fakeroot gcc-fortran grep git hdf5-openmpi lapack lua m4 make mold       \
+      muparser netcdf ninja openmpi patch pcre python sed sudo superlu         \
+      which wget zlib                                                       && \
+  pacman --noconfirm -Scc                                                   && \
+  find /usr/lib/ -type f -name 'libboost*.a' -delete                        && \
+  find /var/cache/pacman -delete
+
+# PETSc (with hypre and metis)
+RUN mkdir /petsc                                                            && \
+    mkdir /build                                                            && \
+    cd /build                                                               && \
+    wget -q "${PETSC_SOURCE}"                                               && \
+    tar xf "petsc-${PETSC_VERSION}.tar.gz"                                  && \
+    cd "petsc-${PETSC_VERSION}"                                             && \
+    export PETSC_ARCH="x86_O2"                                              && \
+    ./configure                                                                \
+    --prefix=/petsc/                                                           \
+    --FFLAGS="${FFLAGS}"                                                       \
+    --CFLAGS="${CFLAGS}"                                                       \
+    --CXXFLAGS="${CXXFLAGS}"                                                   \
+    --download-hypre=1                                                         \
+    --download-metis=1                                                         \
+    --download-parmetis=1                                                      \
+    --download-silo=1                                                          \
+    --with-debugging=1                                                         \
+    --with-fortran-bindings=0                                                  \
+    --with-hdf5=0                                                              \
+    --with-petsc4py=0                                                          \
+    --with-shared-libraries=1                                               && \
+    make -j4 PETSC_DIR="$(pwd)" PETSC_ARCH="$PETSC_ARCH" all                && \
+    make -j4 install                                                        && \
+    rm -rf /petsc/share/                                                    && \
+    rm -rf /petsc/bin/                                                      && \
+    rm -rf /petsc/lib/*.a                                                   && \
+    rm -rf /petsc/lib/*.la                                                  && \
+    rm -rf /petsc/lib/petsc/bin/                                            && \
+    cd /                                                                    && \
+    rm -rf /build/
+
+# SAMRAI. Do an additional postprocessing step of stripping debug symbols.
+RUN mkdir /samrai                                                           && \
+  mkdir -p /build                                                           && \
+  cd /build                                                                 && \
+  wget -q "${SAMRAI_SOURCE}"                                                && \
+  tar xf "${SAMRAI_VERSION}.tar.gz"                                         && \
+  cd "IBSAMRAI2-${SAMRAI_VERSION}"                                          && \
+  mkdir build                                                               && \
+  cd build                                                                  && \
+  ../configure                                                                 \
+      FFLAGS="${FFLAGS} -fPIC"                                                 \
+      CFLAGS="${CFLAGS} -fPIC"                                                 \
+      CXXFLAGS="${CXXFLAGS} -fPIC"                                             \
+      --prefix=/samrai                                                         \
+      --with-F77="$(which gfortran)"                                           \
+      --without-hypre                                                          \
+      --without-silo                                                           \
+      --without-blaslapack                                                     \
+      --without-cubes                                                          \
+      --without-eleven                                                         \
+      --without-petsc                                                          \
+      --without-sundials                                                       \
+      --without-x                                                              \
+      --without-doxygen                                                        \
+      --enable-debug                                                           \
+      --enable-dcomplex                                                        \
+      --with-hdf5=/usr/                                                        \
+      --enable-implicit-template-instantiation                                 \
+      --disable-deprecated                                                  && \
+  make -j4                                                                  && \
+  make -j4 install                                                          && \
+  cd /                                                                      && \
+  find /samrai -type f -name '*.a' | xargs strip -g                         && \
+  rm -rf /build/
+
+# numdiff. Requires -std=gnu99.
+RUN mkdir /numdiff                                                          && \
+  mkdir -p /build                                                           && \
+  cd /build                                                                 && \
+  wget -q "${NUMDIFF_SOURCE}"                                               && \
+  tar xf "numdiff-${NUMDIFF_VERSION}.tar.gz"                                && \
+  cd "numdiff-${NUMDIFF_VERSION}"                                           && \
+  mkdir build                                                               && \
+  cd build                                                                  && \
+  ../configure --disable-nls CFLAGS="-std=gnu99 -O2" --prefix=/numdiff      && \
+  make -j4 install                                                          && \
+  cd /                                                                      && \
+  rm -rf /build/
+
+# ExodusII.
+RUN mkdir /exodus                                                           && \
+  mkdir -p /build                                                           && \
+  cd /build                                                                 && \
+  wget -q "${EXODUS_II_SOURCE}"                                             && \
+  tar xf "v${EXODUS_II_VERSION}.tar.gz"                                     && \
+  cd "seacas-${EXODUS_II_VERSION}"                                          && \
+  mkdir build                                                               && \
+  cd build                                                                  && \
+  cmake -DCMAKE_BUILD_TYPE=Release                                             \
+        -DCMAKE_CXX_FLAGS_RELEASE_OVERRIDE="${CXXFLAGS}"                       \
+        -DCMAKE_C_FLAGS_RELEASE_OVERRIDE="${CFLAGS}"                           \
+        -DSeacas_ENABLE_ALL_PACKAGES=OFF                                       \
+        -DSeacas_ENABLE_ALL_OPTIONAL_PACKAGES=OFF                              \
+        -DSeacas_ENABLE_SECONDARY_TESTED_CODE=OFF                              \
+        -DSeacas_ENABLE_SEACASExodus=ON                                        \
+        -DSeacas_ENABLE_OpenMP=OFF                                             \
+        -DSeacas_HIDE_DEPRECATED_CODE=OFF                                      \
+        -DSEACASExodus_ENABLE_THREADSAFE=OFF                                   \
+        -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON                                 \
+        -DBUILD_SHARED_LIBS=shared                                             \
+        -DTPL_ENABLE_Netcdf=ON                                                 \
+        -DTPL_ENABLE_HDF5=ON                                                   \
+        -DSEACASExodus_ENABLE_HDF5=ON                                          \
+        -DCMAKE_INSTALL_PREFIX=/exodusii                                       \
+        -DHDF5_LIBRARY_DIRS=/usr/lib ../                                    && \
+  make VERBOSE=1 -j4 install                                                && \
+  cd /                                                                      && \
+  rm -rf /build/
+
+# deal.II.
+RUN mkdir /dealii                                                           && \
+  mkdir -p /build                                                           && \
+  cd /build                                                                 && \
+  wget -q "${DEAL_II_SOURCE}"                                               && \
+  tar xf "dealii-${DEAL_II_VERSION}.tar.gz"                                 && \
+  cd "dealii-${DEAL_II_VERSION}"                                            && \
+  sed -i '/NDEBUG/d' cmake/setup_compiler_flags_gnu.cmake                   && \
+  mkdir build                                                               && \
+  cd build                                                                  && \
+  export OMPI_ALLOW_RUN_AS_ROOT=1                                           && \
+  export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1                                   && \
+  cmake -DCMAKE_BUILD_TYPE=Release                                             \
+        -DDEAL_II_CXX_FLAGS_RELEASE="${CXXFLAGS} -DDEBUG"                      \
+        -DCMAKE_INSTALL_PREFIX=/dealii                                         \
+        -DDEAL_II_WITH_MPI=ON                                                  \
+        -DDEAL_II_WITH_MUPARSER=ON                                             \
+        -DDEAL_II_WITH_PETSC=ON                                                \
+        -DPETSC_DIR=/petsc                                                     \
+        -DDEAL_II_WITH_COMPLEX_VALUES=OFF                                      \
+        -DDEAL_II_COMPONENT_EXAMPLES=OFF                                       \
+        -DDEAL_II_COMPONENT_DOCUMENTATION=OFF                                  \
+        -DDEAL_II_WITH_TBB=OFF                                                 \
+        ../                                                                 && \
+   make VERBOSE=1 -j4 install                                               && \
+   cd /                                                                     && \
+   rm -rf /build/
+
+# IBAMR.
+RUN mkdir /ibamr                                                            && \
+  mkdir -p /build                                                           && \
+  cd /build                                                                 && \
+  wget -q "${IBAMR_SOURCE}"                                                 && \
+  tar xf "v${IBAMR_VERSION}.tar.gz"                                         && \
+  cd "IBAMR-${IBAMR_VERSION}"                                               && \
+  mkdir build                                                               && \
+  cd build                                                                  && \
+  cmake -DCMAKE_BUILD_TYPE=Release                                             \
+        -DCMAKE_CXX_FLAGS="${CXXFLAGS}"                                        \
+        -DCMAKE_Fortran_FLAGS="${FFLAGS}"                                      \
+        -DCMAKE_INSTALL_PREFIX=/ibamr                                          \
+        -DNUMDIFF_ROOT=/numdiff                                                \
+        -DPETSC_ROOT=/petsc                                                    \
+        -DHYPRE_ROOT=/petsc                                                    \
+        -DSAMRAI_ROOT=/samrai                                                  \
+        ../                                                                 && \
+  make VERBOSE=1 -j4 install                                                && \
+  cd /                                                                      && \
+  rm -rf /build/
+
+RUN                                                               \
+  useradd --password "$(perl -e 'print crypt('pw', "password")')" \
+          --groups users,wheel build                           && \
+  sed -i 's/# %wheel/%wheel/' /etc/sudoers
