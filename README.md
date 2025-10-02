@@ -10,7 +10,7 @@ https://hub.docker.com/r/wellsd2/ibamr/tags
 - `dependencies/` contains Dockerfiles for building all of IBAMR's dependencies in
   several different configurations. These are used in IBAMR's CI scripts.
 - `ibamr/` contains Dockerfiles for building both IBAMR and its dependencies, as
-  well as some downstream projects (fiddle).
+  well as some external projects (deal.II).
 
 ## Submitting your own images to docker hub
 
