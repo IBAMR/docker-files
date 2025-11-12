@@ -8,7 +8,7 @@ ENV CXXFLAGS="${CFLAGS} -D_GLIBCXX_ASSERTIONS"
 ENV PETSC_VERSION=3.23.6
 ENV PETSC_SOURCE="https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-${PETSC_VERSION}.tar.gz"
 
-ENV SAMRAI_VERSION=2025.09.12
+ENV SAMRAI_VERSION=2025.10.29
 ENV SAMRAI_SOURCE="https://github.com/IBAMR/IBSAMRAI2/archive/refs/tags/${SAMRAI_VERSION}.tar.gz"
 
 ENV NUMDIFF_VERSION=5.9.0
