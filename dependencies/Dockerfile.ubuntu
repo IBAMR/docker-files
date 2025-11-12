@@ -23,8 +23,9 @@ RUN ln -fs /usr/share/zoneinfo/$(cat /etc/timezone) /etc/localtime
 
 RUN apt update &&                                                              \
     apt install -y                                                             \
-        ccache cmake g++ gcc gfortran git libhdf5-openmpi-dev libopenmpi-dev   \
-        liblapack-dev ninja-build python3 python3-distutils wget            && \
+        ccache cmake doxygen g++ gcc gfortran git graphviz libhdf5-openmpi-dev \
+        libopenmpi-dev liblapack-dev ninja-build python3 python3-distutils     \
+        wget                                                                && \
     apt-get clean
 
 # PETSc (with hypre and metis)
