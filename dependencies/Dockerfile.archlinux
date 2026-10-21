@@ -1,26 +1,26 @@
-FROM archlinux:base-20250921.0.423275
+FROM archlinux:base-20261018.0.612668
 MAINTAINER David Wells <drwells@email.unc.edu>
 
-ENV FFLAGS="-O3 -ftrivial-auto-var-init=pattern"
-ENV CFLAGS="-O2 -ftrivial-auto-var-init=pattern -D_FORTIFY_SOURCE=3 -fuse-ld=mold"
+ENV FFLAGS="-O3 -fcheck=all -finit-real=snan -finit-integer=2147483647"
+ENV CFLAGS="-O2 -ftrivial-auto-var-init=pattern -D_FORTIFY_SOURCE=3 -fuse-ld=mold -fstack-protector-all -fcf-protection=full"
 ENV CXXFLAGS="${CFLAGS} -D_GLIBCXX_ASSERTIONS"
 
-ENV PETSC_VERSION=3.23.6
+ENV PETSC_VERSION=3.26.0
 ENV PETSC_SOURCE="https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-${PETSC_VERSION}.tar.gz"
 
-ENV SAMRAI_VERSION=2025.10.29
+ENV SAMRAI_VERSION=2026.10.21
 ENV SAMRAI_SOURCE="https://github.com/IBAMR/IBSAMRAI2/archive/refs/tags/${SAMRAI_VERSION}.tar.gz"
 
 ENV NUMDIFF_VERSION=5.9.0
 ENV NUMDIFF_SOURCE="https://download-mirror.savannah.gnu.org/releases/numdiff/numdiff-${NUMDIFF_VERSION}.tar.gz"
 
-ENV LIBMESH_VERSION=1.7.8
+ENV LIBMESH_VERSION=1.7.9
 ENV LIBMESH_SOURCE="https://github.com/libMesh/libmesh/releases/download/v${LIBMESH_VERSION}/libmesh-${LIBMESH_VERSION}.tar.gz"
 
 RUN                                                                            \
-  echo 'Server = http://mirror.cs.vt.edu/pub/ArchLinux/$repo/os/$arch'         \
+  echo 'Server = https://mirror.cs.odu.edu/archlinux/$repo/os/$arch'           \
       >/etc/pacman.d/mirrorlist                                             && \
-  echo 'Server = http://mirror.cs.pitt.edu/ArchLinux/$repo/os/$arch'           \
+  echo 'Server = https://iad.mirror.rackspace.com/archlinux/$repo/os/$arch'    \
       >>/etc/pacman.d/mirrorlist
 
 RUN                                                                            \
@@ -114,6 +114,7 @@ RUN mkdir /numdiff/                                                         && \
   rm -rf /build/
 
 # libMesh. Add a missing header to communicator.h via sed.
+# Also fix a PETSc incompatibility.
 # Also strip debug symbols.
 RUN mkdir /build/                                                           && \
   cd /build/                                                                && \
@@ -122,6 +123,8 @@ RUN mkdir /build/                                                           && \
   cd "libmesh-${LIBMESH_VERSION}"                                           && \
   sed -i '41i#include <cstdint>'                                               \
     ./contrib/timpi/src/parallel/include/timpi/communicator.h               && \
+  sed -i '61s/char/const char/'                                                \
+    ./include/numerics/petsc_solver_exception.h                             && \
   mkdir build                                                               && \
   cd build                                                                  && \
     ../configure                                                               \
